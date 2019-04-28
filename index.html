@@ -25,7 +25,8 @@ div.card {
   padding: 1vh;
   text-align: left;
   font: bold 1.1rem sans;
-  position: relative }
+  position: relative;
+  vertical-align: middle }
 
 div.face2 { background: #0b2a45 }
 div.face2::before { content: '2'; color: #ddd }
@@ -50,17 +51,21 @@ div.face1024::before { content: '1024'; color: #222 }
 div.face2048 { background: #e4561b }
 div.face2048::before { content: '2048'; color: #222 }
 
+div.wildcard { background: linear-gradient(to top, red 14%, orange 14% 29%, yellow 29% 43%, green 43% 57%, cyan 57% 71%, blue 71% 86%, darkviolet 86%) }
+div.wildcard::before {
+  content: '★';
+  font-size: 5rem;
+  color: #fff;
+  position: relative;
+  top: 50%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-50%);
+  display: inline-block }
+
 #hand div.card:not(.in-hand), #hand svg, .score {
   position: relative;
   top: 50%;
   transform: translateY(-50%) }
-
-#tableau div.card.reducing {
-  margin-top: -18vh;
-  transition: margin-top 1s ease }
-#hand div.card.activating {
-  margin-left: 6vh;
-  transition: margin-left 1s ease }
 
 .highscore {
   position: absolute;
@@ -78,10 +83,14 @@ div.face2048::before { content: '2048'; color: #222 }
   grid-template-columns: repeat(4, 1fr);
   padding: 5vw calc(50vw - 30vh) }
 #tableau div.card { margin: 0 auto -13vh auto }
+#tableau div.card.reducing {
+  margin-top: -18vh;
+  transition: margin-top .6s ease }
 #tableau svg { margin-top: -.3vh }
   .column, .discard { text-align: center }
   .column.active > div.card:last-of-type { box-shadow: 0 0 0 .3vh blue, 0 0 0 1vh white }
   .column.active use, .discard.active use { stroke: blue }
+
 #hand {
   display: grid;
   grid-template-columns: 3fr 1fr;
@@ -90,6 +99,9 @@ div.face2048::before { content: '2048'; color: #222 }
 #hand div.card, #hand svg { display: inline-block }
 #hand div.card { margin-right: -6vh }
 #hand div.card:last-child { cursor: pointer }
+#hand div.card.activating:first-child {
+  margin-left: 6vh;
+  transition: margin-left .6s ease }
 #hand div.card.in-hand {
   cursor: move;
   box-shadow: 0 0 0 .3vh crimson;
@@ -167,9 +179,9 @@ body > svg, .card + svg { display: none }
   <svg viewBox='0 0 123 183'>
     <rect id='null-card' width='119' height='179' x='2' y='2' rx='18' ry='18' fill='grey' stroke-width='4'></rect>
   </svg>
-  <template id='card'>
-    <div class='card'></div>
-  </template>
+  <template id='card'
+    ><div class='card'></div
+  ></template>
   <script>
 
 // Utilities
@@ -205,9 +217,11 @@ var app = new $.Machine({
   discardCoords: null,
   inHand: {},
   vh: document.body.clientHeight / 100,
+  handPipeline: Promise.resolve(),
 
   maxHeight: 8,
-  highCard: 2048
+  highCard: 2048,
+  wildRate: 1/128
 });
 
 // Events
@@ -264,6 +278,7 @@ $.targets({
         vh: document.body.clientHeight / 100,
         tableauCoords: $('.column > :last-of-type').map(el => {
           let {x, y} = el.getBoundingClientRect();
+          if (el.nodeName === 'DIV') y += 5 * this.vh;
           return {x, y}
         }).filter(p => p.x + p.y !== 0),
         discardCoords: (() => {
@@ -274,26 +289,35 @@ $.targets({
     },
 
     reveal () {
-      let value = 2 ** (1 + Math.floor(6 * Math.random())), state = this;
-      this.hand.push(value);
       $.load('card', '.hand');
-      $('.hand > :last-child')[0].classList.add('face' + value);
+      let card = $('.hand > :last-child')[0],
+          value = 2 ** (1 + Math.floor(6 * Math.random())), state = this;
+      if (Math.random() > this.wildRate) card.classList.add('face' + value);
+      else {
+        value = -1;
+        card.classList.add('wildcard')
+      }
+      this.hand.push(value);
       $.queries({'.hand > :last-child': {
         'pointerdown touchstart' (e) {
           if (this.nextElementSibling) return false;
           this.classList.add('in-hand');
-          let {layerX, layerY} = e;
-          if (e.type === 'touchstart') {
-            layerX += e.touches[0].clientX;
-            layerY += e.touches[0].clientY;
+          this.classList.remove('activating');
+          let {layerX, layerY} = e, clientX, clientY;
+          if (e.type === 'pointerdown') ({clientX, clientY} = e);
+          else if (e.type === 'touchstart') {
+            ({clientX, clientY} = e.touches[0]);
+            layerX += clientX;
+            layerY += clientY
           }
           state.inHand = {layerX, layerY};
           state.inHand.card = this;
-          this.style.left = e.clientX - layerX + 'px';
-          this.style.top = e.clientY - layerY + 'px'
+          this.style.left = clientX - layerX + 'px';
+          this.style.top = clientY - layerY + 'px'
         }
       }});
-      $('.hand')[0].insertBefore($('.hand > :last-child')[0], $('.hand > :first-child')[0])
+      if ($('.hand > *').length === 1) setTimeout(() => app.emitAsync('pipeCard', card), 25);
+      else $('.hand')[0].insertBefore(card, $('.hand > :first-child')[0])
     },
 
     'move-card' (x, y) {
@@ -318,16 +342,19 @@ $.targets({
       if (active.length) {
         let el = active[0];
         if (el.classList.contains('column')) {
-          let i = $('.column').indexOf(el), value = parseInt(card.classList.value.match(/\d+$/)[0]);
+          let i = $('.column').indexOf(el), {length} = this.tableau[i],
+              value = card.classList.contains('wildcard') ? this.tableau[i][length - 1] :
+                parseInt(card.classList.value.match(/\d+$/)[0]);
           el.classList.remove('active');
-          if (this.tableau[i].length < this.maxHeight) {
+          if (length < this.maxHeight) {
             this.tableau[i].push(value);
             el.insertBefore(card, $('svg', el)[0]);
             let {x, y} = card.getBoundingClientRect();
+            y += 5 * this.vh;
             this.tableauCoords[i] = {x, y};
             this.hand.shift();
             app.emit('reduce', i)
-          } else if (this.tableau[i].length === this.maxHeight && this.tableau[i][this.maxHeight - 1] === value) {
+          } else if (length === this.maxHeight && this.tableau[i][this.maxHeight - 1] === value) {
             this.tableau[i].push(value);
             card.remove();
             this.hand.shift();
@@ -342,12 +369,16 @@ $.targets({
           app.emit('check-game-over')
         }
         let nextcard = $('.hand > div.card:first-child')[0];
-        nextcard.classList.add('activating');
-        setTimeout(() => {
-          nextcard.classList.remove('activating');
-          app.emit('reveal')
-        }, 1000);
+        if (nextcard) app.emitAsync('pipeCard', nextcard).then(() => app.emit('reveal'));
+        else setTimeout(() => app.emit('reveal'), 600);
       }
+    },
+
+    pipeCard (card) {
+      return this.handPipeline.then(() => new Promise(r => {
+        card.classList.add('activating');
+        setTimeout(() => r(card.classList.remove('activating')), 600)
+      }))
     },
 
     reduce (i) {
@@ -362,8 +393,10 @@ $.targets({
           app.emit('reduce', i)
         } else {
           card.classList.add('reducing');
+          this.tableauCoords[i] = {x: -1000, y: -1000};
           setTimeout(() => {
             let nextcard = $('div.card:nth-last-of-type(2)', column)[0], {x, y} = nextcard.getBoundingClientRect();
+            y += 5 * this.vh;
             this.tableauCoords[i] = {x, y};
             nextcard.classList.remove('face' + curval);
             nextcard.classList.add('face' + curval * 2);
@@ -371,7 +404,7 @@ $.targets({
             $('.score')[0].textContent = (this.score += curval * 2);
             if (curval === this.highCard / 2) app.emit('clear-column', i);
             else app.emit('reduce', i)
-          }, 1000)
+          }, 600)
         }
       } else app.emit('check-game-over')
     },
@@ -388,7 +421,7 @@ $.targets({
         let {x, y} = $('.column > svg')[i].getBoundingClientRect();
         this.tableauCoords[i] = {x, y};
         $('.discard text')[0].textContent = this.discard += 2
-      }, 1000)
+      }, 600)
     },
 
     'check-game-over' () {
