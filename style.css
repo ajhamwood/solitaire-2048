@@ -1,0 +1,137 @@
+html {
+  font-size: 2vh;
+  height: 100% }
+body {
+  margin: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: 5rem auto 12.5rem;
+  user-select: none;
+  -moz-user-select: none;
+  overflow: hidden }
+div.card {
+  height: 8rem;
+  width: 5rem;
+  border-radius: 1rem;
+  box-shadow: 0 0 0 .15rem black, 0 0 0 .5rem white;
+  padding: .5rem;
+  text-align: left;
+  font: bold 1.1rem sans;
+  position: relative;
+  vertical-align: middle }
+
+div.face2 { background: #0b2a45 }
+div.face2::before { content: '2'; color: #ddd }
+div.face4 { background: #0b2a45 }
+div.face4::before { content: '4'; color: #ddd }
+div.face8 { background: #0c626a }
+div.face8::before { content: '8'; color: #ddd }
+div.face16 { background: #0c626a }
+div.face16::before { content: '16'; color: #ddd }
+div.face32 { background: #0c626a }
+div.face32::before { content: '32'; color: #ddd }
+div.face64 { background: #79c537 }
+div.face64::before { content: '64'; color: #222 }
+div.face128 { background: #79c537 }
+div.face128::before { content: '128'; color: #222 }
+div.face256 { background: #f6c42e }
+div.face256::before { content: '256'; color: #222 }
+div.face512 { background: #f6c42e }
+div.face512::before { content: '512'; color: #222 }
+div.face1024 { background: #e4561b }
+div.face1024::before { content: '1024'; color: #222 }
+div.face2048 { background: #e4561b }
+div.face2048::before { content: '2048'; color: #222 }
+
+div.wildcard { background: linear-gradient(to top, red 14%, orange 14% 29%, yellow 29% 43%, green 43% 57%, cyan 57% 71%, blue 71% 86%, darkviolet 86%) }
+div.wildcard::before {
+  content: '★';
+  font-size: 5rem;
+  color: #fff;
+  position: relative;
+  top: 50%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-50%);
+  display: inline-block }
+
+#hand div.card:not(.in-hand), #hand svg, .score {
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%) }
+
+.highscore {
+  position: absolute;
+  top: 1rem;
+  left: 2rem;
+  font: bold 1.5rem sans }
+.highscore::before { content: '👑' }
+.score {
+  margin: 0 auto;
+  width: max-content;
+  font: 2rem sans }
+
+#tableau {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 5vh calc(50vw - 30vh) }
+#tableau div.card { margin: 0 auto -6.5rem auto }
+#tableau div.card.reducing {
+  margin-top: -9rem;
+  transition: margin-top .6s ease }
+#tableau svg { margin-top: -.15rem }
+  .column, .discard { text-align: center }
+  .column.active > div.card:last-of-type { box-shadow: 0 0 0 .15rem blue, 0 0 0 .5rem white }
+  .column.active use, .discard.active use { stroke: blue }
+
+#hand {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  padding: 0 calc(50vw - 30vh);
+  border-top: .15rem dashed gray }
+#hand div.card, #hand svg { display: inline-block }
+#hand div.card { margin-right: -3rem }
+#hand div.card:last-child { cursor: pointer }
+#hand div.card.activating:first-child {
+  margin-left: 3rem;
+  transition: margin-left .6s ease }
+#hand div.card.in-hand {
+  cursor: move;
+  box-shadow: 0 0 0 .15rem crimson;
+  position: absolute }
+
+svg {
+  width: 6.3rem;
+  z-index: -1 }
+body > svg, .card + svg { display: none }
+.discard text {
+  fill: white;
+  font: 6rem sans }
+
+.modal, .notification { display: none }
+.modal.active {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: #bbb8;
+  display: block }
+.modal > div {
+  position: absolute;
+  background: white;
+  padding: 2.5rem 4rem;
+  border-radius: 1rem;
+  left: 50%;
+  top: 50%;
+  transform: translateY(-50%) translateX(-50%);
+  text-align: center;
+  line-height: 2rem }
+.notification.active {
+  position: absolute;
+  display: block;
+  bottom: 1rem;
+  right: 1rem;
+  border: 1px solid grey;
+  background: white;
+  padding: 1rem 1.5rem;
+  line-height: 2rem }
+
+@media (max-aspect-ratio: 5/8) { html { font-size: 3.125vw } }

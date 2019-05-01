@@ -1,0 +1,21 @@
+{
+  "background_color": "darkviolet",
+  "theme_color": "white",
+  "description": "Solitaire card game based on 2048.",
+  "display": "fullscreen",
+  "icons": [
+    {
+      "src": "icons/icon512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ],
+  "name": "Solitaire 2048",
+  "short_name": "Soli2048",
+  "start_url": "index.html"
+}
