@@ -17,7 +17,7 @@ const $ = Object.assign((sel, node = document) => [...node.querySelectorAll(sel)
   queries (obj, node) {
     for (let q in obj) for (let e in obj[q]) for (let ns = $(q, node) || [], es = e.split(' '), i = 0; i < es.length; i++)
       ns.forEach(n => n.addEventListener(es[i], obj[q][e].bind(n))) },
-  load (id, dest = 'body') { $(dest).forEach(n => n.appendChild(document.importNode($('template#' + id)[0].content, true))) } })
+  load (id, dest = 'body') { $(dest).forEach(n => n.appendChild(document.importNode($('template#' + id)[0].content, true))) } });
 
 // Page state
 var app = new $.Machine({
@@ -30,6 +30,7 @@ var app = new $.Machine({
   tableauCoords: [],
   discardCoords: null,
   inHand: {},
+  active: null,
   vh: document.body.clientHeight / 100,
   handPipeline: Promise.resolve(),
 
@@ -142,47 +143,46 @@ $.targets({
       $.queries({'.hand > :last-child': {
         'mousedown touchstart' (e) {
           if (this.nextElementSibling) return false;
-          let layerX, layerY, clientX, clientY;
-          if (e.type === 'mousedown') ({layerX, layerY, clientX, clientY} = e);
-          else if (e.type === 'touchstart') {
-            ({clientX, clientY} = e.touches[0]);
-            let {x, y} = this.getBoundingClientRect();
-            layerX = clientX - x;
-            layerY = clientY - y
-          }
-          state.inHand = {layerX, layerY};
-          state.inHand.card = this;
-          this.classList.add('in-hand');
           this.classList.remove('activating');
-          this.style.left = clientX - layerX + 'px';
-          this.style.top = clientY - layerY + 'px'
+          let {clientX, clientY} = e.type === 'touchstart' ? e.touches[0] : e,
+              {x, y} = this.getBoundingClientRect();
+          this.classList.add('in-hand');
+          state.inHand = {layerX: clientX - x, layerY: clientY - y};
+          state.inHand.card = this;
+          this.style.left = x + 'px';
+          this.style.top = y + 'px'
         }
       }});
       if ($('.hand > *').length === 1) setTimeout(() => app.emitAsync('pipeCard', card), 25); //BUG: How to wait for redraw?
       else $('.hand')[0].insertBefore(card, $('.hand > :first-child')[0])
     },
 
-    'move-card' (x, y) { // TODO: IntersectionObserver
-      let style = this.inHand.card.style;
-      style.left = x - this.inHand.layerX + 'px';
-      style.top = y - this.inHand.layerY + 'px'
-      this.tableauCoords.forEach((obj, i) => {
-        let d = Math.hypot(obj.x - x + this.inHand.layerX, obj.y - y + this.inHand.layerY);
-        if (d < this.vh * 6) $('.column')[i].classList.add('active');
-        else $('.column')[i].classList.remove('active')
-      });
-      let dc = this.discardCoords, d = Math.hypot(dc.x - x + this.inHand.layerX, dc.y - y + this.inHand.layerY);
-      if (d < this.vh * 6) $('.discard')[0].classList.add('active');
-      else $('.discard')[0].classList.remove('active')
+    'move-card' (x, y) {
+      let style = this.inHand.card.style, card = this.inHand;
+      style.left = x - card.layerX + 'px';
+      style.top = y - card.layerY + 'px';
+      $('.discard, .column').forEach((el, i) => {
+        if (this.active !== null && this.active !== i) return false;
+        let obj = i === 4 ? this.discardCoords : this.tableauCoords[i],
+            d = Math.hypot(obj.x - x + card.layerX, obj.y - y + card.layerY);
+        if (this.active === null && d < this.vh * 6) {
+          this.active = i;
+          el.classList.add('active');
+        } else if (this.active !== null && d >= this.vh * 6) {
+          this.active = null;
+          el.classList.remove('active')
+        }
+      })
     },
 
     'drop-card' () {
-      let {card} = this.inHand, active = $('.active');
+      let {card} = this.inHand;
       card.classList.remove('in-hand');
       card.style = null;
       this.inHand = {};
-      if (active.length) {
-        let el = active[0];
+      if (this.active === null) return false;
+      else {
+        let el = $('.active')[0];
         if (el.classList.contains('column')) {
           let i = $('.column').indexOf(el), {length} = this.tableau[i],
               value = card.classList.contains('wildcard') ? -1 : parseInt(card.classList.value.match(/\d+$/)[0]);
@@ -212,7 +212,7 @@ $.targets({
         let nextcard = $('.hand > div.card:first-child')[0];
         if (nextcard) app.emitAsync('pipeCard', nextcard).then(() => app.emit('reveal'));
         else setTimeout(() => app.emit('reveal'), 600);
-      } else return false
+      }
     },
 
     pipeCard (card) {
@@ -281,11 +281,7 @@ $.targets({
     setDeferredPrompt (e) { this.deferredPrompt = e },
     a2hs () {
       this.deferredPrompt.prompt();
-      this.deferredPrompt.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === 'accepted') console.log('User accepted the A2HS prompt');
-        else console.log('User dismissed the A2HS prompt');
-        this.deferredPrompt = null
-      })
+      this.deferredPrompt.userChoice.then(() => this.deferredPrompt = null)
     }
 
   }

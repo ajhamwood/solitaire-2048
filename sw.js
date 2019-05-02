@@ -1,4 +1,4 @@
-const VERSION = 'v0.2',
+const VERSION = 'v0.2.1',
       ENV = 'production',
       CACHE = 'solitaire-2048';
 
