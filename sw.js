@@ -1,5 +1,5 @@
 // End version string with '-dev' to set developer environment mode
-const VERSION = 'v0.2.2',
+const VERSION = 'v0.2.3',
       ENV = /-dev$/.test(VERSION) ? 'development' : 'production',
       CACHE = 'solitaire-2048';
 

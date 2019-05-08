@@ -9,11 +9,12 @@ const $ = Object.assign((sel, node = document) => [...node.querySelectorAll(sel)
       emit (e, ...args) { return e in es && v(es[e]).reduce((s, fn) => (fn.apply(s, args), s), state) },
       emitAsync (e, ...args) { return e in es && v(es[e]).reduce((p, fn) => p.then(s => r(fn.apply(s, args)).then(() => s)), r(state)) } }) },
   targets (obj, target = window) {
-    for (let t in obj) for (let k in target) if (k.match(new RegExp(`^${t}$`))) {
-      if (EventTarget.prototype.isPrototypeOf(target[k])) for (let e in obj[t])
-        for (let es = e.split(' '), i = 0; i < es.length; i++) target[k].addEventListener(es[i], obj[t][e].bind(target[k]));
-      else if ($.Machine.prototype.isPrototypeOf(target[k])) for (let e in obj[t])
-        for (let es = e.split(' '), i = 0; i < es.length; i++) target[k].on(es[i], obj[t][e]) } },
+    let p, use = (m, fn) => { for (let es = p.split(' '), i = 0; i < es.length; i++) target[m](es[i], fn) };
+    for (p in obj) if (Function.prototype.isPrototypeOf(obj[p])) {
+      if (EventTarget.prototype.isPrototypeOf(target)) use('addEventListener', obj[p].bind(target));
+      else if ($.Machine.prototype.isPrototypeOf(target)) use('on', obj[p])
+    } else if (p in target) $.targets(obj[p], target[p]);
+    else for (let k in target) if (k.match(new RegExp(`^${p}$`))) $.targets(obj[p], target[k]) },
   queries (obj, node) {
     for (let q in obj) for (let e in obj[q]) for (let ns = $(q, node) || [], es = e.split(' '), i = 0; i < es.length; i++)
       ns.forEach(n => n.addEventListener(es[i], obj[q][e].bind(n))) },
@@ -44,7 +45,7 @@ var app = new $.Machine({
   checkUpdate: false
 });
 
-// Events
+// UI Events
 $.queries({
   '#game-over button': { click () {
     $('#game-over')[0].classList.remove('active');
@@ -68,39 +69,38 @@ $.queries({
   } }
 });
 
-$.targets({ serviceWorker: { controllerchange (e) { app.emit('update') } } }, navigator);
-
 $.targets({
-  window: {
 
-    load () {
-      app.emit('init');
-      app.emit('start')
-    },
-
-    'mousemove touchmove' (e) {
-      let {card} = app.getState().inHand, {clientX, clientY} = e.type === 'touchmove' ? e.touches[0] : e;
-      if (card && !card.nextElementSibling && card.classList.contains('in-hand')) app.emit('move-card', clientX, clientY)
-    },
-
-    'mouseup touchend' (e) {
-      let {card} = app.getState().inHand;
-      if (card && !card.nextElementSibling && card.classList.contains('in-hand')) app.emit('drop-card')
-    },
-
-    resize () { app.emit('resize') },
-
-    beforeinstallprompt (e) {
-      e.preventDefault();
-      if (sessionStorage.suppressA2hs) return false;
-      app.emit('saveA2hsPrompt', e);
-      $('#a2hs')[0].classList.add('active')
-    }
-
+  // Window events
+  load () {
+    app.emit('init');
+    app.emit('start')
   },
 
-  app: {
+  'mousemove touchmove' (e) {
+    let {card} = app.getState().inHand, {clientX, clientY} = e.type === 'touchmove' ? e.touches[0] : e;
+    if (card && !card.nextElementSibling && card.classList.contains('in-hand')) app.emit('move-card', clientX, clientY)
+  },
 
+  'mouseup touchend' (e) {
+    let {card} = app.getState().inHand;
+    if (card && !card.nextElementSibling && card.classList.contains('in-hand')) app.emit('drop-card')
+  },
+
+  resize () { app.emit('resize') },
+
+  beforeinstallprompt (e) {
+    e.preventDefault();
+    if (sessionStorage.suppressA2hs) return false;
+    app.emit('saveA2hsPrompt', e);
+    $('#a2hs')[0].classList.add('active')
+  },
+
+  // ServiceWorker events
+  navigator: { serviceWorker: { controllerchange (e) { app.emit('update') } } },
+
+  // Page state events
+  app: {
     init () { //TODO: Tutorial
       $('.highscore')[0].textContent = this.highscore = parseInt(localStorage.highscore) || 0;
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js')
@@ -108,10 +108,7 @@ $.targets({
       app.emit('debug');
 
       // Check for updates every hour on the hour
-      let check = () => {
-        this.checkUpdate = true;
-        return check
-      };
+      let check = () => ((this.checkUpdate = true), check);
       setTimeout(() => setInterval(check(), 3.6e6), 3.6e6 - Date.now() + new Date().setMinutes(0, 0, 0))
     },
 
@@ -301,8 +298,7 @@ $.targets({
     update () {
       if (this.installingSw) app.emit('debug');
       else $('#update')[0].classList.add('active');
-      this.installingSw = false;
-
+      this.installingSw = false
     },
 
     debug () {
@@ -310,7 +306,7 @@ $.targets({
         .catch(() => fetch('/version').then(res => res.text()).then(ver => this.version = ver))
         .then(() => /-dev$/.test(this.version) && app.emit('debug-actions'))
     },
-    'debug-actions' () { $('.debug')[0].textContent = this.version },
-
+    'debug-actions' () { $('.debug')[0].textContent = this.version }
   }
+
 })
