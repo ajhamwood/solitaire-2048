@@ -59,16 +59,19 @@ div.wildcard::before {
   top: 50%;
   transform: translateY(-50%) }
 
-.highscore {
+.highscore, .debug {
   position: absolute;
   top: 1rem;
-  left: 2rem;
   font: bold 1.5rem sans }
+.highscore { left: 2rem }
 .highscore::before { content: '👑' }
 .score {
   margin: 0 auto;
   width: max-content;
   font: 2rem sans }
+.debug {
+  right: 2rem;
+  color: #f00 }
 
 #tableau {
   display: grid;

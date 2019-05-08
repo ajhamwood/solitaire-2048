@@ -38,7 +38,10 @@ var app = new $.Machine({
   highCard: 2048,
   wildRate: 1/256,
 
-  deferredPrompt: null
+  version: null,
+  installingSw: false,
+  a2hsPrompt: null,
+  checkUpdate: false
 });
 
 // Events
@@ -65,7 +68,7 @@ $.queries({
   } }
 });
 
-$.targets({ serviceWorker: { controllerchange (e) { $('#update')[0].classList.add('active') } } }, navigator);
+$.targets({ serviceWorker: { controllerchange (e) { app.emit('update') } } }, navigator);
 
 $.targets({
   window: {
@@ -90,7 +93,7 @@ $.targets({
     beforeinstallprompt (e) {
       e.preventDefault();
       if (sessionStorage.suppressA2hs) return false;
-      app.emit('setDeferredPrompt', e);
+      app.emit('saveA2hsPrompt', e);
       $('#a2hs')[0].classList.add('active')
     }
 
@@ -101,6 +104,15 @@ $.targets({
     init () { //TODO: Tutorial
       $('.highscore')[0].textContent = this.highscore = parseInt(localStorage.highscore) || 0;
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js')
+        .then(reg => { if (reg.installing) this.installingSw = true });
+      app.emit('debug');
+
+      // Check for updates every hour on the hour
+      let check = () => {
+        this.checkUpdate = true;
+        return check
+      };
+      setTimeout(() => setInterval(check(), 3.6e6), 3.6e6 - Date.now() + new Date().setMinutes(0, 0, 0))
     },
 
     start () {
@@ -112,7 +124,9 @@ $.targets({
       });
       app.emit('resize');
       app.emit('reveal');
-      app.emit('reveal')
+      app.emit('reveal');
+      if (this.checkUpdate) navigator.serviceWorker.ready.then(reg => reg.update())
+        .then(() => this.checkUpdate = false)
     },
 
     resize () {
@@ -143,9 +157,9 @@ $.targets({
       $.queries({'.hand > :last-child': {
         'mousedown touchstart' (e) {
           if (this.nextElementSibling) return false;
-          this.classList.remove('activating');
           let {clientX, clientY} = e.type === 'touchstart' ? e.touches[0] : e,
               {x, y} = this.getBoundingClientRect();
+          this.classList.remove('activating');
           this.classList.add('in-hand');
           state.inHand = {layerX: clientX - x, layerY: clientY - y};
           state.inHand.card = this;
@@ -153,7 +167,7 @@ $.targets({
           this.style.top = y + 'px'
         }
       }});
-      if ($('.hand > *').length === 1) setTimeout(() => app.emitAsync('pipeCard', card), 25); //BUG: How to wait for redraw?
+      if ($('.hand > *').length === 1) setTimeout(() => app.emitAsync('pipeCard', card), 25); //BUG: How to wait for redraw in firefox?
       else $('.hand')[0].insertBefore(card, $('.hand > :first-child')[0])
     },
 
@@ -278,11 +292,25 @@ $.targets({
       }
     },
 
-    setDeferredPrompt (e) { this.deferredPrompt = e },
+    saveA2hsPrompt (e) { this.a2hsPrompt = e },
     a2hs () {
-      this.deferredPrompt.prompt();
-      this.deferredPrompt.userChoice.then(() => this.deferredPrompt = null)
-    }
+      this.a2hsPrompt.prompt();
+      this.a2hsPrompt.userChoice.then(() => this.a2hsPrompt = null)
+    },
+
+    update () {
+      if (this.installingSw) app.emit('debug');
+      else $('#update')[0].classList.add('active');
+      this.installingSw = false;
+
+    },
+
+    debug () {
+      new Promise((resolve, reject) => this.version === null ? reject() : resolve())
+        .catch(() => fetch('/version').then(res => res.text()).then(ver => this.version = ver))
+        .then(() => /-dev$/.test(this.version) && app.emit('debug-actions'))
+    },
+    'debug-actions' () { $('.debug')[0].textContent = this.version },
 
   }
 })
