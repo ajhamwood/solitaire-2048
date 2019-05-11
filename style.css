@@ -77,64 +77,75 @@ div.wildcard::before {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   padding: 5vh calc(50vw - 30vh) }
-#tableau div.card { margin: 0 auto -6.5rem auto }
-#tableau div.card.reducing {
-  margin-top: -9rem;
-  transition: margin-top .6s ease }
-#tableau svg { margin-top: -.15rem }
   .column, .discard { text-align: center }
-  .column.active > div.card:last-of-type { box-shadow: 0 0 0 .15rem blue, 0 0 0 .5rem white }
-  .column.active use, .discard.active use { stroke: blue }
+    .column.active > div.card:last-of-type { box-shadow: 0 0 0 .15rem blue, 0 0 0 .5rem white }
+      .column.active use, .discard.active use { stroke: blue }
+    #tableau div.card { margin: 0 auto -6.5rem auto }
+    #tableau div.card.reducing {
+      margin-top: -9rem;
+      transition: margin-top .6s ease }
+    #tableau svg { margin-top: -.15rem }
 
 #hand {
   display: grid;
   grid-template-columns: 3fr 1fr;
   padding: 0 calc(50vw - 30vh);
   border-top: .15rem dashed gray }
-#hand div.card, #hand svg { display: inline-block }
-#hand div.card { margin-right: -3rem }
-#hand div.card:last-child { cursor: pointer }
-#hand div.card.activating:first-child {
-  margin-left: 3rem;
-  transition: margin-left .6s ease }
-#hand div.card.in-hand {
-  cursor: move;
-  box-shadow: 0 0 0 .15rem crimson;
-  position: absolute }
+  #hand div.card, #hand svg { display: inline-block }
+  #hand div.card { margin-right: -3rem }
+  #hand div.card:last-child { cursor: pointer }
+  #hand div.card.activating:first-child {
+    margin-left: 3rem;
+    transition: margin-left .6s ease }
+  #hand div.card.in-hand {
+    cursor: move;
+    box-shadow: 0 0 0 .15rem crimson;
+    position: absolute }
 
 svg {
   width: 6.3rem;
   z-index: -1 }
 body > svg, .card + svg { display: none }
-.discard text {
-  fill: white;
-  font: 6rem sans }
+  .discard text {
+    fill: white;
+    font: 6rem sans }
 
-.modal, .notification { display: none }
+.modal { display: none }
 .modal.active {
   position: absolute;
   width: 100%;
   height: 100%;
   background: #bbb8;
   display: block }
-.modal > div {
+  .modal > div {
+    position: absolute;
+    background: white;
+    padding: 2.5rem 4rem;
+    border-radius: 1rem;
+    left: 50%;
+    top: 50%;
+    transform: translateY(-50%) translateX(-50%);
+    text-align: center;
+    line-height: 2rem }
+
+#notifications {
   position: absolute;
-  background: white;
-  padding: 2.5rem 4rem;
-  border-radius: 1rem;
-  left: 50%;
-  top: 50%;
-  transform: translateY(-50%) translateX(-50%);
-  text-align: center;
-  line-height: 2rem }
-.notification.active {
-  position: absolute;
-  display: block;
   bottom: 1rem;
   right: 1rem;
-  border: 1px solid grey;
-  background: white;
-  padding: 1rem 1.5rem;
-  line-height: 2rem }
+  display: flex;
+  flex-flow: column-reverse wrap;
+  align-items: flex-end;
+  height: 90%;
+  overflow: hidden }
+  .notification {
+    position: relative;
+    display: block;
+    width: max-content;
+    margin-top: .5rem;
+    border: 1px solid grey;
+    background: white;
+    padding: 1rem 1.5rem;
+    line-height: 2rem }
+    .notification > button:nth-last-child(2) { margin-right: 1rem }
 
 @media (max-aspect-ratio: 5/8) { html { font-size: 3.125vw } }

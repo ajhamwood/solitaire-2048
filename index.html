@@ -54,21 +54,19 @@
       <button>Play again</button>
     </div>
   </section>
-  <section id='a2hs' class='notification'>
-    <div>Add to home screen / desktop?</div>
-    <button id='install-ok'>OK</button>
-    <button id='install-cancel'>Cancel</button>
-  </section>
-  <section id='update' class='notification'>
-    <div>New update available!</div>
-    <button id='update-ok'>Refresh</button>
-    <button id='update-cancel'>Dismiss</button>
-  </section>
+  <section id='notifications'></section>
   <svg viewBox='0 0 123 183'>
     <rect id='null-card' width='119' height='179' x='2' y='2' rx='18' ry='18' fill='grey' stroke-width='4'></rect>
   </svg>
   <template id='card'
     ><div class='card'></div
+  ></template>
+  <template id='notification'
+    ><div class='notification'
+      ><div></div
+      ><button id='ok'></button
+      ><button id='cancel'></button
+    ></div
   ></template>
   <noscript><h6>Only viewable with JavaScript enabled.</h6></noscript>
 </body>

@@ -8,6 +8,7 @@ const $ = Object.assign((sel, node = document) => [...node.querySelectorAll(sel)
       stop (e, fname = '') { e in es && delete es[e][fname]; return this },
       emit (e, ...args) { return e in es && v(es[e]).reduce((s, fn) => (fn.apply(s, args), s), state) },
       emitAsync (e, ...args) { return e in es && v(es[e]).reduce((p, fn) => p.then(s => r(fn.apply(s, args)).then(() => s)), r(state)) } }) },
+  pipe: (ps => (p, fn) => ps[p] = (ps[p] || Promise.resolve()).then(fn))({}),
   targets (obj, target = window) {
     let p, use = (m, fn) => { for (let es = p.split(' '), i = 0; i < es.length; i++) target[m](es[i], fn) };
     for (p in obj) if (Function.prototype.isPrototypeOf(obj[p])) {
@@ -18,7 +19,9 @@ const $ = Object.assign((sel, node = document) => [...node.querySelectorAll(sel)
   queries (obj, node) {
     for (let q in obj) for (let e in obj[q]) for (let ns = $(q, node) || [], es = e.split(' '), i = 0; i < es.length; i++)
       ns.forEach(n => n.addEventListener(es[i], obj[q][e].bind(n))) },
-  load (id, dest = 'body') { $(dest).forEach(n => n.appendChild(document.importNode($('template#' + id)[0].content, true))) } });
+  load (id, dest = 'body') {
+    let stamp = document.importNode($('template#' + id)[0].content, true);
+    return $(dest).map(n => [...stamp.cloneNode(true).childNodes.values()].map(c => n.appendChild(c))) } });
 
 // Page state
 var app = new $.Machine({
@@ -33,16 +36,15 @@ var app = new $.Machine({
   inHand: {},
   active: null,
   vh: document.body.clientHeight / 100,
-  handPipeline: Promise.resolve(),
 
   maxHeight: 8,
   highCard: 2048,
   wildRate: 1/256,
 
   version: null,
-  installingSw: false,
-  a2hsPrompt: null,
-  checkUpdate: false
+  swReady: false,
+  checkUpdate: false,
+  a2hsPrompt: null
 });
 
 // UI Events
@@ -51,21 +53,6 @@ $.queries({
     $('#game-over')[0].classList.remove('active');
     $('div.card').forEach(x => x.remove());
     app.emit('start')
-  } },
-  '#a2hs #install-ok': { click (e) {
-    $('#a2hs')[0].classList.remove('active');
-    app.emit('a2hs')
-  } },
-  '#a2hs #install-cancel': { click (e) {
-    $('#a2hs')[0].classList.remove('active');
-    sessionStorage.suppressA2hs = true
-  } },
-  '#update #update-ok': { click (e) {
-    $('#update')[0].classList.remove('active');
-    location.reload()
-  } },
-  '#update #update-cancel': { click (e) {
-    $('#update')[0].classList.remove('active')
   } }
 });
 
@@ -92,8 +79,18 @@ $.targets({
   beforeinstallprompt (e) {
     e.preventDefault();
     if (sessionStorage.suppressA2hs) return false;
-    app.emit('saveA2hsPrompt', e);
-    $('#a2hs')[0].classList.add('active')
+    app.emit('deferA2hs', e);
+    app.emit('notification', {
+      type: 'install',
+      text: 'Add to home screen / desktop?',
+      okText: 'OK',
+      cancelText: 'Cancel',
+      okHandler (e) {
+        sessionStorage.suppressA2hs = true;
+        app.emit('a2hs')
+      },
+      cancelHandler () { sessionStorage.suppressA2hs = true }
+    })
   },
 
   // ServiceWorker events
@@ -104,12 +101,14 @@ $.targets({
     init () { //TODO: Tutorial
       $('.highscore')[0].textContent = this.highscore = parseInt(localStorage.highscore) || 0;
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js')
-        .then(reg => { if (reg.installing) this.installingSw = true });
-      app.emit('debug');
-
-      // Check for updates every hour on the hour
-      let check = () => ((this.checkUpdate = true), check);
-      setTimeout(() => setInterval(check(), 3.6e6), 3.6e6 - Date.now() + new Date().setMinutes(0, 0, 0))
+        .then(reg => this.swReady = !reg.installing)
+        .then(() => app.emitAsync('debug')).then(() => {
+          // Check for updates every hour on the hour, every minute in development mode
+          let check = () => ((this.checkUpdate = true), check);
+          /-dev$/.test(this.version) ?
+            setTimeout(() => setInterval(check(), 6e4), 6e4 - Date.now() + new Date().setSeconds(0, 0)) :
+            setTimeout(() => setInterval(check(), 3.6e6), 3.6e6 - Date.now() + new Date().setMinutes(0, 0, 0))
+        })
     },
 
     start () {
@@ -133,7 +132,7 @@ $.targets({
           let {x, y} = el.getBoundingClientRect();
           if (el.nodeName === 'DIV') y += 5 * this.vh;
           return {x, y}
-        }).filter(p => p.x + p.y !== 0),
+        }).filter(p => p.x !== 0 && p.y !== 0),
         discardCoords: (() => {
           let {x, y} = $('.discard > svg')[0].getBoundingClientRect();
           return {x, y}
@@ -142,8 +141,7 @@ $.targets({
     },
 
     reveal () {
-      $.load('card', '.hand');
-      let card = $('.hand > :last-child')[0],
+      let card = $.load('card', '.hand')[0][0],
           value = 2 ** (1 + Math.floor(6 * Math.random())), state = this;
       if (Math.random() > this.wildRate) card.classList.add('face' + value);
       else {
@@ -227,7 +225,7 @@ $.targets({
     },
 
     pipeCard (card) {
-      return this.handPipeline.then(() => new Promise(r => {
+      return $.pipe('handAnimation', () => new Promise(r => {
         card.classList.add('activating');
         setTimeout(() => r(card.classList.remove('activating')), 600)
       }))
@@ -289,22 +287,45 @@ $.targets({
       }
     },
 
-    saveA2hsPrompt (e) { this.a2hsPrompt = e },
+    notification (obj) {
+      let note = $.load('notification', '#notifications')[0][0];
+      $('div', note)[0].textContent = obj.text;
+      note.id = obj.type;
+      $('button', note).forEach(el => {
+        let which = el.id;
+        el.textContent = obj[which + 'Text'];
+        el.id = obj.type + '-' + which;
+        $.queries({ ['button#' + el.id]: { click (e) {
+          note.remove();
+          obj[which + 'Handler'].bind(this)(e)
+        } } }, note)
+      })
+    },
+
+    deferA2hs (e) { this.a2hsPrompt = e },
     a2hs () {
       this.a2hsPrompt.prompt();
       this.a2hsPrompt.userChoice.then(() => this.a2hsPrompt = null)
     },
 
     update () {
-      if (this.installingSw) app.emit('debug');
-      else $('#update')[0].classList.add('active');
-      this.installingSw = false
+      if (this.swReady) app.emit('notification', {
+        type: 'update',
+        text: 'New update available!',
+        okText: 'Refresh',
+        cancelText: 'Dismiss',
+        okHandler (e) { location.reload() },
+        cancelHandler () {}
+      });
+      this.swReady = true
     },
 
-    debug () {
-      new Promise((resolve, reject) => this.version === null ? reject() : resolve())
-        .catch(() => fetch('/version').then(res => res.text()).then(ver => this.version = ver))
-        .then(() => /-dev$/.test(this.version) && app.emit('debug-actions'))
+    debug () { // BUG: Cannot recover from Ctrl-F5
+      let recover;
+      return $.pipe('debug', () => new Promise((resolve, reject) => this.version === null ? reject() : resolve())
+        .catch(recover = () => fetch('version')
+          .then(res => res.status === 404 ? recover() : res.text().then(ver => this.version = ver)))
+        .then(() => /-dev$/.test(this.version) && app.emit('debug-actions')))
     },
     'debug-actions' () { $('.debug')[0].textContent = this.version }
   }
