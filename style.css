@@ -5,7 +5,7 @@ body {
   margin: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: 5rem auto 12.5rem;
+  grid-template-rows: 5rem 32.5rem 12.5rem;
   user-select: none;
   -moz-user-select: none;
   overflow: hidden }
@@ -91,16 +91,17 @@ div.wildcard::before {
   grid-template-columns: 3fr 1fr;
   padding: 0 calc(50vw - 30vh);
   border-top: .15rem dashed gray }
-  #hand div.card, #hand svg { display: inline-block }
-  #hand div.card { margin-right: -3rem }
-  #hand div.card:last-child { cursor: pointer }
-  #hand div.card.activating:first-child {
-    margin-left: 3rem;
-    transition: margin-left .6s ease }
-  #hand div.card.in-hand {
-    cursor: move;
-    box-shadow: 0 0 0 .15rem crimson;
-    position: absolute }
+  .hand { padding: 0 1rem }
+    #hand div.card, #hand svg { display: inline-block }
+    #hand div.card { margin-right: -3rem }
+    #hand div.card:last-child { cursor: pointer }
+    #hand div.card.activating:first-child {
+      margin-left: 3rem;
+      transition: margin-left .6s ease }
+    #hand div.card.in-hand {
+      cursor: move;
+      box-shadow: 0 0 0 .15rem crimson;
+      position: absolute }
 
 svg {
   width: 6.3rem;
@@ -148,4 +149,4 @@ body > svg, .card + svg { display: none }
     line-height: 2rem }
     .notification > button:nth-last-child(2) { margin-right: 1rem }
 
-@media (max-aspect-ratio: 5/8) { html { font-size: 3.125vw } }
+@media (max-aspect-ratio: 5/8) { html { font-size: 3.2vw } }
