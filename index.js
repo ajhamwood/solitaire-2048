@@ -243,7 +243,7 @@ $.targets({
 
     'check-game-over' () {
       if (this.tableau.every(x => x.length === this.maxHeight &&
-        x[this.maxHeight - 1] !== this.hand[0]) && this.discard === 0) {
+        x[this.maxHeight - 1] !== this.hand[0]) && this.discard === 0 && this.hand[0] !== -1) {
         let modal = $('#game-over')[0];
         modal.classList.add('active');
         if (this.highscore < this.score) $('.highscore')[0].textContent =
