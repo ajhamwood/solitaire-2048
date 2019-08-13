@@ -1,27 +1,33 @@
 // Utilities
-const $ = Object.assign((sel, node = document) => [...node.querySelectorAll(sel).values()], {
-  Machine: function (state) {
-    let es = {}, v = Object.values, r = Promise.resolve.bind(Promise); Object.seal(state);
-    return Object.assign(this, {
-      getState () { return state },
-      on (e, fn) { (es[e] = es[e] || {})[fn.name] = fn; return this },
-      stop (e, fname = '') { e in es && delete es[e][fname]; return this },
-      emit (e, ...args) { return e in es && v(es[e]).reduce((s, fn) => (fn.apply(s, args), s), state) },
-      emitAsync (e, ...args) { return e in es && v(es[e]).reduce((p, fn) => p.then(s => r(fn.apply(s, args)).then(() => s)), r(state)) } }) },
-  pipe: (ps => (p, fn) => ps[p] = (ps[p] || Promise.resolve()).then(fn))({}),
-  targets (obj, target = window) {
-    let p, use = (m, fn) => { for (let es = p.split(' '), i = 0; i < es.length; i++) target[m](es[i], fn) };
-    for (p in obj) if (Function.prototype.isPrototypeOf(obj[p])) {
-      if (EventTarget.prototype.isPrototypeOf(target)) use('addEventListener', obj[p].bind(target));
-      else if ($.Machine.prototype.isPrototypeOf(target)) use('on', obj[p])
-    } else if (p in target) $.targets(obj[p], target[p]);
-    else for (let k in target) if (k.match(new RegExp(`^${p}$`))) $.targets(obj[p], target[k]) },
-  queries (obj, node) {
-    for (let q in obj) for (let e in obj[q]) for (let ns = $(q, node) || [], es = e.split(' '), i = 0; i < es.length; i++)
-      ns.forEach(n => n.addEventListener(es[i], obj[q][e].bind(n))) },
-  load (id, dest = 'body') {
-    let stamp = document.importNode($('template#' + id)[0].content, true);
-    return $(dest).map(n => [...stamp.cloneNode(true).childNodes.values()].map(c => n.appendChild(c))) } });
+var $ = (wm => { let v = Object.values, r = Promise.resolve.bind(Promise),
+    test = (obj, con) => obj.constructor === con || con.prototype.isPrototypeOf(obj),
+    add = (k, t, fn, es = wm.get(k) || {}) => { remove(k, t, fn.name); k.addEventListener(t, (es[t] = es[t] || {})[fn.name] = fn); wm.set(k, es) },
+    remove = (k, t, fname, es = wm.get(k)) => { if (es && t in es && fname in es[t]) {
+      k.removeEventListener(t, es[t][fname]); delete es[t][fname] && (v(es[t]).length || delete es[t]) && (v(es).length || wm.delete(k)) } };
+  return Object.assign((sel, node = document) => v(node.querySelectorAll(sel)), {
+    Machine: function (state) { let es = {}; Object.seal(state);
+      return Object.assign(this, {
+        state () { return state },
+        on (t, fn) { (es[t] = es[t] || {})[fn.name] = fn; return this },
+        stop (t, fname = '') { t in es && delete es[t][fname] && (v(es[t]).length || delete es[t]); return this },
+        emit (t, ...args) { return t in es && v(es[t]).reduce((s, fn) => (fn.apply(s, args), s), state) },
+        emitAsync (t, ...args) { return t in es && v(es[t]).reduce((p, fn) => p.then(s => r(fn.apply(s, args)).then(() => s)), r(state)) } }) },
+    pipe: (ps => (p, ...ands) => ps[p] = (ps[p] || r()).then(() => Promise.all(ands.map(ors =>
+      test(ors, Array) && Promise.race(ors.map(fn => fn())) || test(ors, Function) && ors()))))({}),
+    targets (obj, target = window) {
+      for (let ts in obj) if (test(obj[ts], Function)) { if (test(target, $.Machine)) ts.split(' ').forEach(t => target.on(t, obj[ts]));
+        else if (test(target, EventTarget)) ts.split(' ').forEach(t => add(target, t, obj[ts].bind(target))) }
+      else if (test(obj[ts], String)) { if (test(target, $.Machine)) ts.split(' ').forEach(t => target.stop(t, obj[ts]));
+        else if (test(target, EventTarget)) ts.split(' ').forEach(t => remove(target, t, 'bound ' + obj[ts])) }
+      else if (ts in target) $.targets(obj[ts], target[ts]);
+      else for (let k in target) if (k.match(new RegExp(`^${ts}$`))) $.targets(obj[ts], target[k]) },
+    queries (obj, root) {
+      for (let q in obj) { let ns = $(q, root); if (ns.length) for (let ts in obj[q])
+        if (test(obj[q][ts], Function)) ts.split(' ').forEach(t => ns.forEach(n => add(n, t, obj[q][ts].bind(n))));
+        else if (test(obj[q][ts], String)) ts.split(' ').forEach(t => ns.forEach(n => remove(n, t, 'bound ' + obj[q][ts]))) } },
+    load (id, dest = 'body') {
+      let stamp = document.importNode($('template#' + id)[0].content, true);
+      return $(dest).map(n => v(stamp.cloneNode(true).childNodes).map(c => n.appendChild(c))) } }) })(new WeakMap());
 
 
 // Game functionality
@@ -75,12 +81,10 @@ $.targets({
     },
 
     start () {
-      Object.assign(this, {
-        tableau: [[], [], [], []],
-        hand: [],
-        discard: ($('.discard text')[0].textContent = 2),
-        score: ($('.score')[0].textContent = 0)
-      });
+      this.tableau = [[], [], [], []];
+      this.hand = [];
+      this.discard = ($('.discard text')[0].textContent = 2);
+      this.score = ($('.score')[0].textContent = 0);
       game.emit('resize');
       game.emit('reveal');
       game.emit('reveal');
@@ -88,18 +92,14 @@ $.targets({
     },
 
     resize () {
-      Object.assign(this, {
-        vh: parseFloat(getComputedStyle(document.documentElement).fontSize) / 2,
-        tableauCoords: $('.column > :last-of-type').map(el => {
-          let {x, y} = el.getBoundingClientRect();
-          if (el.nodeName === 'DIV') y += 5 * this.vh;
-          return {x, y}
-        }).filter(p => p.x !== 0 && p.y !== 0),
-        discardCoords: (() => {
-          let {x, y} = $('.discard > svg')[0].getBoundingClientRect();
-          return {x, y}
-        })()
-      })
+      this.vh = parseFloat(getComputedStyle(document.documentElement).fontSize) / 2;
+      this.tableauCoords = $('.column > :last-of-type').map(el => {
+        let {x, y} = el.getBoundingClientRect();
+        if (el.nodeName === 'DIV') y += 5 * this.vh;
+        return {x, y}
+      }).filter(p => p.x !== 0 && p.y !== 0);
+      let {x, y} = $('.discard > svg')[0].getBoundingClientRect();
+      this.discardCoords = {x, y}
     },
 
     reveal () {
@@ -288,7 +288,7 @@ $.targets({
 
   // Window events
 
-  load () {
+  load: function pwaload () {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js')
       .then(reg => this.swReady = !reg.installing)
       .then(() => pwa.emitAsync('debug')).then(() => {
