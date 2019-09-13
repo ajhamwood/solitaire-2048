@@ -50,7 +50,8 @@ var game = new $.Machine({
   // Game constants
   maxHeight: 8,
   highCard: 2048,
-  wildRate: 1/256
+  wildRate: 1/256,
+  count: (i => () => i++)(0)
 });
 
 // UI Events
@@ -139,7 +140,7 @@ $.targets({
             d = Math.hypot(obj.x - clientX + layerX, obj.y - clientY + layerY);
         if (this.active === null && d < this.vh * 6) {
           this.active = i;
-          el.classList.add('active');
+          el.classList.add('active')
         } else if (this.active !== null && d >= this.vh * 6) {
           this.active = null;
           el.classList.remove('active')
@@ -164,7 +165,8 @@ $.targets({
             this.tableau[i].push(value);
             el.insertBefore(card, $('svg', el)[0]);
             let {x, y} = card.getBoundingClientRect();
-            y += 5 * this.vh;
+            x += window.pageXOffset;
+            y += 5 * this.vh + window.pageYOffset;
             this.tableauCoords[i] = {x, y};
             this.hand.shift();
             game.emit('reduce', i)
@@ -353,6 +355,11 @@ $.targets({
         .catch(recover = () => fetch('version')
           .then(res => res.status === 404 ? recover() : res.text().then(ver => this.version = ver)))
         .then(() => /-dev$/.test(this.version) && app.emit('debug', {version: this.version})))
+    },
+
+    uninstall () {
+      navigator.serviceWorker.ready.then(reg => reg.unregister());
+      caches.delete('offline')
     }
   }
 })

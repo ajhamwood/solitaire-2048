@@ -3,11 +3,14 @@ html {
   height: 100% }
 body {
   margin: 0;
+  position: fixed;
   height: 100%;
+  width: 100%;
   display: grid;
   grid-template-rows: 5rem 32.5rem 12.5rem;
   user-select: none;
   -moz-user-select: none;
+  -webkit-user-select: none;
   overflow: hidden }
 div.card {
   height: 8rem;
